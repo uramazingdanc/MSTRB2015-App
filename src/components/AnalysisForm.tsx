@@ -52,17 +52,105 @@ export const AnalysisForm = () => {
       return;
     }
     
-    // Calculate beta
-    const beta = inputs.fc <= 28 ? 0.85 : 0.85 - (0.05/7) * (inputs.fc - 28);
+    // Step 1: Compute Cmax
+    const cmax = (3 * inputs.d) / 7;
     
-    // Calculate phi
-    const phi = 0.65 + 0.25 * (800 - inputs.fy) / (1000 - inputs.fy);
+    // Step 2: Determine beta based on conditions
+    let beta: number;
+    if (inputs.fc >= 17 && inputs.fc <= 28) {
+      beta = 0.85;
+    } else if (inputs.fc > 28 && inputs.fc < 55) {
+      beta = 0.85 - (0.05/7) * (inputs.fc - 28);
+    } else {
+      beta = 0.65;
+    }
     
-    // Calculate Mn (placeholder - actual beam analysis would be more complex)
-    const Mn = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta);
+    // Step 3: Compute Amax
+    const amax = beta * cmax;
     
-    // Determine beam type (simplified)
-    const beamType = inputs.Asprime > 0 ? 'Doubly Reinforced' : 'Singly Reinforced';
+    // Step 4: Compute Asmax
+    const asmax = (0.85 * inputs.fc * amax * inputs.b) / inputs.fy;
+    
+    // Step 5: Compare Asmax and As to determine beam type
+    const beamType = asmax > inputs.As ? 'Singly Reinforced' : 'Doubly Reinforced';
+    
+    let solutions = [
+      `Step 1: Compute Cmax = (3d)/7 = (3 × ${inputs.d})/7 = ${cmax.toFixed(2)} mm`,
+      `Step 2: Determine β = ${beta.toFixed(4)}`,
+      `Step 3: Compute Amax = β × Cmax = ${beta.toFixed(4)} × ${cmax.toFixed(2)} = ${amax.toFixed(2)} mm`,
+      `Step 4: Compute Asmax = (0.85 × f'c × Amax × b)/fy = (0.85 × ${inputs.fc} × ${amax.toFixed(2)} × ${inputs.b})/${inputs.fy} = ${asmax.toFixed(2)} mm²`,
+      `Step 5: Compare Asmax and As: ${asmax.toFixed(2)} ${asmax > inputs.As ? '>' : '<'} ${inputs.As} → ${beamType}`
+    ];
+    
+    let phi: number;
+    let Mn: number;
+    let finalAnswer: string;
+    
+    if (beamType === 'Singly Reinforced') {
+      // For Singly Reinforced Beams
+      // Step 6: Compute a and c
+      const a = (inputs.As * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      const c = a / beta;
+      
+      // Step 7: Compute fs 
+      const fs = 600 * ((inputs.d - c) / c);
+      const fsStatus = fs >= inputs.fy ? "fs ≥ fy, steel yields" : "fs < fy, steel does not yield";
+      
+      // Step 8: Compute reduction factor Ø
+      phi = fs >= inputs.fy ? 0.9 : (0.65 + 0.25 * ((fs - inputs.fy) / (600 - inputs.fy)));
+      phi = Math.min(Math.max(phi, 0.65), 0.9); // Ensure phi is between 0.65 and 0.9
+      
+      // Step 9: Compute Mu
+      Mn = phi * inputs.As * inputs.fy * (inputs.d - a/2) / 1000000; // Convert to kN·m
+      
+      solutions = [
+        ...solutions,
+        `Step 6: Compute a = (As × fy)/(0.85 × f'c × b) = (${inputs.As} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
+        `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
+        `Step 7: Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
+        `         ${fsStatus}`,
+        `Step 8: Compute reduction factor Ø = ${phi.toFixed(4)}`,
+        `Step 9: Compute Mu = Ø × As × fy × (d-a/2) = ${phi.toFixed(4)} × ${inputs.As} × ${inputs.fy} × (${inputs.d}-${a.toFixed(2)}/2) = ${Mn.toFixed(2)} kN·m`
+      ];
+      
+      finalAnswer = `The beam is Singly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
+    } else {
+      // For Doubly Reinforced Beams
+      // Step 6: Compute As1
+      const as1 = asmax;
+      const as2 = inputs.As - as1;
+      
+      // Step 7: Compute a, c, fs, f's
+      const a = (as1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      const c = a / beta;
+      
+      const fs = 600 * ((inputs.d - c) / c);
+      const fprime = 600 * ((c - inputs.dprime) / c);
+      const fprimeStatus = fprime >= inputs.fy ? "f's ≥ fy, compression steel yields" : "f's < fy, compression steel does not yield";
+      
+      // Step 8: Compute reduction factor Ø
+      phi = 0.65 + 0.25 * ((fs - inputs.fy) / (600 - inputs.fy));
+      phi = Math.min(Math.max(phi, 0.65), 0.9); // Ensure phi is between 0.65 and 0.9
+      
+      // Step 9: Compute Mu
+      const effectiveFprime = Math.min(fprime, inputs.fy);
+      Mn = (phi * (as1 * inputs.fy * (inputs.d - a/2) + inputs.Asprime * effectiveFprime * (inputs.d - inputs.dprime))) / 1000000; // Convert to kN·m
+      
+      solutions = [
+        ...solutions,
+        `Step 6: Compute As1 = Asmax = ${as1.toFixed(2)} mm²`,
+        `         Compute As2 = As - As1 = ${inputs.As} - ${as1.toFixed(2)} = ${as2.toFixed(2)} mm²`,
+        `Step 7: Compute a = (As1 × fy)/(0.85 × f'c × b) = (${as1.toFixed(2)} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
+        `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
+        `         Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
+        `         Compute f's = 600 × ((c-d')/c) = 600 × ((${c.toFixed(2)}-${inputs.dprime})/${c.toFixed(2)}) = ${fprime.toFixed(2)} MPa`,
+        `         ${fprimeStatus}`,
+        `Step 8: Compute reduction factor Ø = ${phi.toFixed(4)}`,
+        `Step 9: Compute Mu = Ø × (As1 × fy × (d-a/2) + A's × f's × (d-d')) = ${Mn.toFixed(2)} kN·m`
+      ];
+      
+      finalAnswer = `The beam is Doubly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
+    }
     
     // Create the results object
     const analysisResults: AnalysisResults = {
@@ -70,13 +158,8 @@ export const AnalysisForm = () => {
       phi,
       Mn,
       beamType,
-      solutions: [
-        `β = ${beta.toFixed(4)}`,
-        `φ = ${phi.toFixed(4)}`,
-        `Mn = ${Mn.toFixed(2)} kN·m`,
-        `Beam Type: ${beamType}`
-      ],
-      finalAnswer: `The beam is ${beamType} with a nominal moment capacity of ${Mn.toFixed(2)} kN·m.`
+      solutions,
+      finalAnswer
     };
     
     setResults(analysisResults);
