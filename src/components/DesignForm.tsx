@@ -55,37 +55,160 @@ export const DesignForm = () => {
       toast.error("All values must be positive");
       return;
     }
-    
-    // Calculate beta
+
+    // Step 1: Determine Beta
     const beta = inputs.fc <= 28 ? 0.85 : 0.85 - (0.05/7) * (inputs.fc - 28);
     
-    // Calculate phi
+    // Calculate Pmax (reinforcement ratio)
+    const pmax = (3/7) * ((0.85 * inputs.fc * beta) / inputs.fy);
+    
+    // Step 2: Calculate phi (reduction factor)
     const phi = 0.65 + 0.25 * (800 - inputs.fy) / (1000 - inputs.fy);
     
-    // Calculate Mnmax
+    // Calculate Mnmax (maximum nominal moment capacity)
     const Mnmax = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta);
     
-    // Determine beam type
+    // Step 3: Determine beam type
     const beamType = inputs.MU > Mnmax ? 'Doubly Reinforced' : 'Singly Reinforced';
     
-    // Calculate required reinforcement (simplified)
+    // Initialize variables for step-by-step solutions
+    let solutions: string[] = [
+      `Step 1: Determine Beta (β)`,
+      `β = ${inputs.fc <= 28 ? "0.85" : `0.85 - (0.05/7) × (${inputs.fc} - 28)`} = ${beta.toFixed(4)}`,
+      `Pmax = (3/7) × ((0.85 × ${inputs.fc} × ${beta.toFixed(4)}) / ${inputs.fy}) = ${pmax.toFixed(6)}`,
+      `Step 2: Compute Mnmax and Reduction Factor (φ)`,
+      `Mnmax = (51/140) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/14 × ${beta.toFixed(4)})`,
+      `Mnmax = ${Mnmax.toFixed(2)} kN·m`,
+      `φ = 0.65 + 0.25 × (800 - ${inputs.fy}) / (1000 - ${inputs.fy}) = ${phi.toFixed(4)}`,
+      `φMnmax = ${phi.toFixed(4)} × ${Mnmax.toFixed(2)} = ${(phi * Mnmax).toFixed(2)} kN·m`,
+      `Step 3: Identify Beam Type`,
+      `Mu = ${inputs.MU} kN·m`,
+      `Since ${inputs.MU} ${inputs.MU <= Mnmax ? "≤" : ">"} ${Mnmax.toFixed(2)} kN·m, this is a ${beamType}`
+    ];
+
     let As = 0;
     let Asprime = 0;
     
     if (beamType === 'Singly Reinforced') {
-      // Simplified formula for singly reinforced beam
-      const rho = 0.85 * (inputs.fc / inputs.fy) * (1 - Math.sqrt(1 - (2 * inputs.MU * 1000000) / (0.85 * inputs.fc * inputs.b * Math.pow(inputs.d, 2))));
-      As = rho * inputs.b * inputs.d;
-      Asprime = 0;
-    } else {
-      // Simplified formula for doubly reinforced beam
-      const excessMoment = inputs.MU - Mnmax;
-      Asprime = (excessMoment * 1000000) / (0.85 * inputs.fy * (inputs.d - inputs.dprime));
+      // Calculate ØMtn for tension-controlled section
+      const phiMtn = (459/1600) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/16 * beta);
       
-      // Calculate tension reinforcement
-      const rho = 0.85 * (inputs.fc / inputs.fy) * (1 - Math.sqrt(1 - (2 * Mnmax * 1000000) / (0.85 * inputs.fc * inputs.b * Math.pow(inputs.d, 2))));
-      As = rho * inputs.b * inputs.d + Asprime * (inputs.fy / inputs.fy);
+      solutions.push(`Step 4: Compute ØMtn for tension-controlled section`);
+      solutions.push(`ØMtn = (459/1600) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/16 × ${beta.toFixed(4)})`);
+      solutions.push(`ØMtn = ${phiMtn.toFixed(2)} kN·m`);
+      
+      if (inputs.MU < phiMtn) {
+        // Tension Controlled Section
+        solutions.push(`Since Mu (${inputs.MU} kN·m) < ØMtn (${phiMtn.toFixed(2)} kN·m), the beam is Tension Controlled`);
+        solutions.push(`For Tension Controlled sections, φ = 0.9`);
+        
+        const phi_tension = 0.9;
+        // Calculate Rn
+        const Rn = (inputs.MU / (phi_tension * inputs.b * Math.pow(inputs.d, 2))) * 1000000;
+        
+        solutions.push(`Step 5: Compute Rn`);
+        solutions.push(`Rn = (${inputs.MU} × 10⁶) / (0.9 × ${inputs.b} × ${inputs.d}²) = ${Rn.toFixed(4)} MPa`);
+        
+        // Calculate reinforcement ratio
+        const rho = (0.85 * inputs.fc / inputs.fy) * (1 - Math.sqrt(1 - (2 * Rn) / (0.85 * inputs.fc)));
+        
+        solutions.push(`Step 6: Compute Reinforcement Ratio (ρ)`);
+        solutions.push(`ρ = (0.85 × ${inputs.fc} / ${inputs.fy}) × (1 - √(1 - (2 × ${Rn.toFixed(4)}) / (0.85 × ${inputs.fc})))`);
+        solutions.push(`ρ = ${rho.toFixed(6)}`);
+        
+        // Calculate required steel area
+        As = rho * inputs.b * inputs.d;
+        
+        solutions.push(`Step 7: Compute As`);
+        solutions.push(`As = ρ × b × d = ${rho.toFixed(6)} × ${inputs.b} × ${inputs.d} = ${As.toFixed(2)} mm²`);
+      } else {
+        // Transition Region
+        solutions.push(`Since Mu (${inputs.MU} kN·m) > ØMtn (${phiMtn.toFixed(2)} kN·m), the beam is in the Transition Region`);
+        
+        // Approximate solution for neutral axis depth (c)
+        // This is a simplification as the exact solution would require an iterative approach
+        const k = inputs.MU * 1000000 / (0.85 * inputs.fc * inputs.b * Math.pow(inputs.d, 2));
+        const c_approx = (1 - Math.sqrt(1 - 2 * k)) * inputs.d;
+        
+        solutions.push(`Step 5: Approximate solution for neutral axis depth (c)`);
+        solutions.push(`c ≈ ${c_approx.toFixed(2)} mm`);
+        
+        // Calculate the depth of equivalent stress block
+        const a = beta * c_approx;
+        
+        solutions.push(`Step 6: Compute depth of equivalent stress block (a)`);
+        solutions.push(`a = β × c = ${beta.toFixed(4)} × ${c_approx.toFixed(2)} = ${a.toFixed(2)} mm`);
+        
+        // Calculate steel area
+        As = (0.85 * inputs.fc * a * inputs.b) / inputs.fy;
+        
+        solutions.push(`Step 7: Compute As`);
+        solutions.push(`As = (0.85 × ${inputs.fc} × ${a.toFixed(2)} × ${inputs.b}) / ${inputs.fy} = ${As.toFixed(2)} mm²`);
+      }
+    } else {
+      // Doubly Reinforced Beam
+      // Step 4: Compute As1
+      const As1 = pmax * inputs.b * inputs.d;
+      
+      solutions.push(`Step 4: Compute As1 (for balanced section)`);
+      solutions.push(`As1 = Pmax × b × d = ${pmax.toFixed(6)} × ${inputs.b} × ${inputs.d} = ${As1.toFixed(2)} mm²`);
+      
+      // Step 5: Compute ØMn2 (additional moment to be resisted by compression steel)
+      const phiMn2 = inputs.MU - (phi * Mnmax);
+      
+      solutions.push(`Step 5: Compute ØMn2 (additional moment)`);
+      solutions.push(`ØMn2 = Mu - φMnmax = ${inputs.MU} - (${phi.toFixed(4)} × ${Mnmax.toFixed(2)}) = ${phiMn2.toFixed(2)} kN·m`);
+      
+      // Step 6: Compute As2 (additional tension steel)
+      const As2 = (phiMn2 * 1000000) / (inputs.fy * (inputs.d - inputs.dprime) * phi);
+      
+      solutions.push(`Step 6: Compute As2 (additional tension steel)`);
+      solutions.push(`As2 = (${phiMn2.toFixed(2)} × 10⁶) / (${inputs.fy} × (${inputs.d} - ${inputs.dprime}) × ${phi.toFixed(4)})`);
+      solutions.push(`As2 = ${As2.toFixed(2)} mm²`);
+      
+      // Step 7: Compute a and c
+      const a = (As1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      const c = a / beta;
+      
+      solutions.push(`Step 7: Compute a and c`);
+      solutions.push(`a = (${As1.toFixed(2)} × ${inputs.fy}) / (0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`);
+      solutions.push(`c = a / β = ${a.toFixed(2)} / ${beta.toFixed(4)} = ${c.toFixed(2)} mm`);
+      
+      // Step 8: Compute f's (stress in compression steel)
+      const fs_prime = 600 * ((c - inputs.dprime) / c);
+      
+      solutions.push(`Step 8: Compute f's (stress in compression steel)`);
+      solutions.push(`f's = 600 × ((${c.toFixed(2)} - ${inputs.dprime}) / ${c.toFixed(2)}) = ${fs_prime.toFixed(2)} MPa`);
+      
+      if (fs_prime >= inputs.fy) {
+        // Compression Bar Yields
+        solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) ≥ fy (${inputs.fy} MPa), the compression bar yields`);
+        
+        As = As1 + As2;
+        Asprime = As2;
+        
+        solutions.push(`Step 8.1: Compute As and A's`);
+        solutions.push(`As = As1 + As2 = ${As1.toFixed(2)} + ${As2.toFixed(2)} = ${As.toFixed(2)} mm²`);
+        solutions.push(`A's = As2 = ${As2.toFixed(2)} mm²`);
+      } else {
+        // Compression Bar Does Not Yield
+        solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) < fy (${inputs.fy} MPa), the compression bar does not yield`);
+        
+        Asprime = (As2 * inputs.fy) / fs_prime;
+        As = As1 + Asprime;
+        
+        solutions.push(`Step 8.2: Compute A's and As`);
+        solutions.push(`A's = (As2 × fy) / f's = (${As2.toFixed(2)} × ${inputs.fy}) / ${fs_prime.toFixed(2)} = ${Asprime.toFixed(2)} mm²`);
+        solutions.push(`As = As1 + A's = ${As1.toFixed(2)} + ${Asprime.toFixed(2)} = ${As.toFixed(2)} mm²`);
+      }
     }
+    
+    // Create the final answer
+    let finalAnswer = `The beam requires ${As.toFixed(0)} mm² of tension reinforcement`;
+    if (beamType === 'Doubly Reinforced') {
+      finalAnswer += ` and ${Asprime.toFixed(0)} mm² of compression reinforcement`;
+    }
+    finalAnswer += `.`;
     
     // Create the results object
     const designResults: DesignResults = {
@@ -95,21 +218,14 @@ export const DesignForm = () => {
       beamType,
       As,
       Asprime,
-      solutions: [
-        `β = ${beta.toFixed(4)}`,
-        `φ = ${phi.toFixed(4)}`,
-        `Mnmax = ${Mnmax.toFixed(2)} kN·m`,
-        `Beam Type: ${beamType}`,
-        `Required As = ${As.toFixed(2)} mm²`,
-        `Required A's = ${Asprime.toFixed(2)} mm²`,
-      ],
-      finalAnswer: `The beam requires ${As.toFixed(0)} mm² of tension reinforcement${beamType === 'Doubly Reinforced' ? ` and ${Asprime.toFixed(0)} mm² of compression reinforcement` : ''}.`
+      solutions,
+      finalAnswer
     };
     
     setResults(designResults);
     setShowResults(true);
     
-    toast.success("Design completed successfully");
+    toast.success("Design calculations completed successfully");
   };
   
   return (
