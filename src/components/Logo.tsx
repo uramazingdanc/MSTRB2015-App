@@ -47,8 +47,7 @@ export const Logo = ({ className, size = "md", showText = true }: LogoProps) => 
       
       {showText && (
         <div className="ml-2 text-white" style={{ fontSize: `${size === "sm" ? 0.7 : size === "md" ? 1 : size === "lg" ? 1.3 : 2}rem` }}>
-          <span className="font-bold tracking-wider">MSTRB</span>
-          <span className="font-light tracking-wide text-xs align-top ml-0.5">2015</span>
+          <span className="font-bold tracking-wider">2015</span>
         </div>
       )}
     </div>
