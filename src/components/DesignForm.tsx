@@ -8,8 +8,6 @@ import { toast } from "sonner";
 interface DesignInputs {
   fc: number;
   fy: number;
-  MD: number;
-  ML: number;
   MU: number;
   b: number;
   d: number;
@@ -31,8 +29,6 @@ export const DesignForm = () => {
   const [inputs, setInputs] = useState<DesignInputs>({
     fc: 21,
     fy: 420,
-    MD: 50,
-    ML: 30,
     MU: 120,
     b: 300,
     d: 550,
@@ -65,8 +61,9 @@ export const DesignForm = () => {
     // Step 2: Calculate phi (reduction factor)
     const phi = 0.65 + 0.25 * (800 - inputs.fy) / (1000 - inputs.fy);
     
-    // Calculate Mnmax (maximum nominal moment capacity)
-    const Mnmax = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta);
+    // Calculate Mnmax (maximum nominal moment capacity) - Updated formula
+    // Mnmax = (51/140) * beta * fc * b * d^2 * (1 - 3/14 * beta) * (1/1000^2)
+    const Mnmax = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta) / 1000000;
     
     // Step 3: Determine beam type
     const beamType = inputs.MU > Mnmax ? 'Doubly Reinforced' : 'Singly Reinforced';
@@ -77,7 +74,7 @@ export const DesignForm = () => {
       `β = ${inputs.fc <= 28 ? "0.85" : `0.85 - (0.05/7) × (${inputs.fc} - 28)`} = ${beta.toFixed(4)}`,
       `Pmax = (3/7) × ((0.85 × ${inputs.fc} × ${beta.toFixed(4)}) / ${inputs.fy}) = ${pmax.toFixed(6)}`,
       `Step 2: Compute Mnmax and Reduction Factor (φ)`,
-      `Mnmax = (51/140) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/14 × ${beta.toFixed(4)})`,
+      `Mnmax = (51/140) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/14 × ${beta.toFixed(4)}) × (1/1000²)`,
       `Mnmax = ${Mnmax.toFixed(2)} kN·m`,
       `φ = 0.65 + 0.25 × (800 - ${inputs.fy}) / (1000 - ${inputs.fy}) = ${phi.toFixed(4)}`,
       `φMnmax = ${phi.toFixed(4)} × ${Mnmax.toFixed(2)} = ${(phi * Mnmax).toFixed(2)} kN·m`,
@@ -90,11 +87,12 @@ export const DesignForm = () => {
     let Asprime = 0;
     
     if (beamType === 'Singly Reinforced') {
-      // Calculate ØMtn for tension-controlled section
-      const phiMtn = (459/1600) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/16 * beta);
+      // Calculate ØMtn for tension-controlled section - Updated formula
+      // phiMtn = (459/1600) * beta * fc * b * d^2 * (1 - 3/16 * beta) * (1/1000^2)
+      const phiMtn = (459/1600) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/16 * beta) / 1000000;
       
       solutions.push(`Step 4: Compute ØMtn for tension-controlled section`);
-      solutions.push(`ØMtn = (459/1600) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/16 × ${beta.toFixed(4)})`);
+      solutions.push(`ØMtn = (459/1600) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/16 × ${beta.toFixed(4)}) × (1/1000²)`);
       solutions.push(`ØMtn = ${phiMtn.toFixed(2)} kN·m`);
       
       if (inputs.MU < phiMtn) {
@@ -256,30 +254,12 @@ export const DesignForm = () => {
             />
             
             <InputField
-              name="MD"
-              label="MD"
-              unit="kN·m"
-              value={inputs.MD}
-              onChange={handleChange}
-              tooltip="Design moment"
-            />
-            
-            <InputField
-              name="ML"
-              label="ML"
-              unit="kN·m"
-              value={inputs.ML}
-              onChange={handleChange}
-              tooltip="Live load moment"
-            />
-            
-            <InputField
               name="MU"
               label="MU"
               unit="kN·m"
               value={inputs.MU}
               onChange={handleChange}
-              tooltip="Ultimate moment"
+              tooltip="Ultimate moment (If MD and ML are provided, use Mu = 1.2DL + 1.6LL)"
             />
             
             <InputField

@@ -92,13 +92,19 @@ export const AnalysisForm = () => {
       const a = (inputs.As * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
-      // Step 7: Compute fs 
+      // Step 7: Compute fs - the strain in the steel
       const fs = 600 * ((inputs.d - c) / c);
-      const fsStatus = fs >= inputs.fy ? "fs ≥ fy, steel yields" : "fs < fy, steel does not yield";
       
-      // Step 8: Compute reduction factor Ø
-      phi = fs >= inputs.fy ? 0.9 : (0.65 + 0.25 * ((fs - inputs.fy) / (600 - inputs.fy)));
-      phi = Math.min(Math.max(phi, 0.65), 0.9); // Ensure phi is between 0.65 and 0.9
+      // Step 8: Compute reduction factor Ø - Updated with new criteria
+      if (fs >= 1000) {
+        phi = 0.9;
+      } else if (fs >= inputs.fy && fs < 1000) {
+        phi = 0.65 + 0.25 * ((fs - inputs.fy) / (1000 - inputs.fy));
+      } else {
+        phi = 0.65;
+      }
+      
+      const fsStatus = fs >= inputs.fy ? (fs >= 1000 ? "fs ≥ 1000, steel yields fully" : "fy ≤ fs < 1000, steel yields (transition)") : "fs < fy, steel does not yield";
       
       // Step 9: Compute Mu
       Mn = phi * inputs.As * inputs.fy * (inputs.d - a/2) / 1000000; // Convert to kN·m
@@ -109,45 +115,80 @@ export const AnalysisForm = () => {
         `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
         `Step 7: Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
         `         ${fsStatus}`,
-        `Step 8: Compute reduction factor Ø = ${phi.toFixed(4)}`,
-        `Step 9: Compute Mu = Ø × As × fy × (d-a/2) = ${phi.toFixed(4)} × ${inputs.As} × ${inputs.fy} × (${inputs.d}-${a.toFixed(2)}/2) = ${Mn.toFixed(2)} kN·m`
+        `Step 8: Compute reduction factor Ø:`
       ];
+      
+      if (fs >= 1000) {
+        solutions.push(`         Since fs (${fs.toFixed(2)}) ≥ 1000, Ø = 0.90`);
+      } else if (fs >= inputs.fy && fs < 1000) {
+        solutions.push(`         Since ${inputs.fy} ≤ fs (${fs.toFixed(2)}) < 1000, Ø = 0.65 + 0.25 × ((${fs.toFixed(2)} - ${inputs.fy})/(1000 - ${inputs.fy})) = ${phi.toFixed(4)}`);
+      } else {
+        solutions.push(`         Since fs (${fs.toFixed(2)}) < fy (${inputs.fy}), Ø = 0.65`);
+      }
+      
+      solutions.push(`Step 9: Compute Mu = Ø × As × fy × (d-a/2) = ${phi.toFixed(4)} × ${inputs.As} × ${inputs.fy} × (${inputs.d}-${a.toFixed(2)}/2) = ${Mn.toFixed(2)} kN·m`);
       
       finalAnswer = `The beam is Singly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
     } else {
-      // For Doubly Reinforced Beams
-      // Step 6: Compute As1
-      const as1 = asmax;
-      const as2 = inputs.As - as1;
-      
-      // Step 7: Compute a, c, fs, f's
-      const a = (as1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      // For Doubly Reinforced Beams - Updated approach
+      // Step 6: Assuming compression steel yields
+      // Calculate a, c for balanced section
+      const a = (asmax * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
-      const fs = 600 * ((inputs.d - c) / c);
+      // Check if compression steel yields
       const fprime = 600 * ((c - inputs.dprime) / c);
       const fprimeStatus = fprime >= inputs.fy ? "f's ≥ fy, compression steel yields" : "f's < fy, compression steel does not yield";
       
+      // Calculate As2
+      const As2 = inputs.Asprime;
+      
+      // Calculate As1
+      const As1 = inputs.As - As2;
+      
       // Step 8: Compute reduction factor Ø
-      phi = 0.65 + 0.25 * ((fs - inputs.fy) / (600 - inputs.fy));
-      phi = Math.min(Math.max(phi, 0.65), 0.9); // Ensure phi is between 0.65 and 0.9
+      const fs = 600 * ((inputs.d - c) / c);
+      if (fs >= 1000) {
+        phi = 0.9;
+      } else if (fs >= inputs.fy && fs < 1000) {
+        phi = 0.65 + 0.25 * ((fs - inputs.fy) / (1000 - inputs.fy));
+      } else {
+        phi = 0.65;
+      }
       
       // Step 9: Compute Mu
       const effectiveFprime = Math.min(fprime, inputs.fy);
-      Mn = (phi * (as1 * inputs.fy * (inputs.d - a/2) + inputs.Asprime * effectiveFprime * (inputs.d - inputs.dprime))) / 1000000; // Convert to kN·m
+      Mn = (phi * (As1 * inputs.fy * (inputs.d - a/2) + inputs.Asprime * effectiveFprime * (inputs.d - inputs.dprime))) / 1000000; // Convert to kN·m
       
       solutions = [
         ...solutions,
-        `Step 6: Compute As1 = Asmax = ${as1.toFixed(2)} mm²`,
-        `         Compute As2 = As - As1 = ${inputs.As} - ${as1.toFixed(2)} = ${as2.toFixed(2)} mm²`,
-        `Step 7: Compute a = (As1 × fy)/(0.85 × f'c × b) = (${as1.toFixed(2)} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
+        `Step 6: Compute a = (Asmax × fy)/(0.85 × f'c × b) = (${asmax.toFixed(2)} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
         `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
-        `         Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
-        `         Compute f's = 600 × ((c-d')/c) = 600 × ((${c.toFixed(2)}-${inputs.dprime})/${c.toFixed(2)}) = ${fprime.toFixed(2)} MPa`,
+        `Step 7: Compute f's = 600 × ((c-d')/c) = 600 × ((${c.toFixed(2)}-${inputs.dprime})/${c.toFixed(2)}) = ${fprime.toFixed(2)} MPa`,
         `         ${fprimeStatus}`,
-        `Step 8: Compute reduction factor Ø = ${phi.toFixed(4)}`,
-        `Step 9: Compute Mu = Ø × (As1 × fy × (d-a/2) + A's × f's × (d-d')) = ${Mn.toFixed(2)} kN·m`
+        `         Compute As2 = A's = ${inputs.Asprime} mm²`,
+        `         Compute As1 = As - As2 = ${inputs.As} - ${inputs.Asprime} = ${As1.toFixed(2)} mm²`,
+        `         Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
+        `Step 8: Compute reduction factor Ø:`
       ];
+      
+      if (fs >= 1000) {
+        solutions.push(`         Since fs (${fs.toFixed(2)}) ≥ 1000, Ø = 0.90`);
+      } else if (fs >= inputs.fy && fs < 1000) {
+        solutions.push(`         Since ${inputs.fy} ≤ fs (${fs.toFixed(2)}) < 1000, Ø = 0.65 + 0.25 × ((${fs.toFixed(2)} - ${inputs.fy})/(1000 - ${inputs.fy})) = ${phi.toFixed(4)}`);
+      } else {
+        solutions.push(`         Since fs (${fs.toFixed(2)}) < fy (${inputs.fy}), Ø = 0.65`);
+      }
+      
+      if (fprime >= inputs.fy) {
+        solutions.push(`Step 9: Compute Mu = Ø × (As1 × fy × (d-a/2) + A's × fy × (d-d'))`);
+        solutions.push(`         Mu = ${phi.toFixed(4)} × (${As1.toFixed(2)} × ${inputs.fy} × (${inputs.d}-${a.toFixed(2)}/2) + ${inputs.Asprime} × ${inputs.fy} × (${inputs.d}-${inputs.dprime}))`);
+      } else {
+        solutions.push(`Step 9: Compute Mu = Ø × (As1 × fy × (d-a/2) + A's × f's × (d-d'))`);
+        solutions.push(`         Mu = ${phi.toFixed(4)} × (${As1.toFixed(2)} × ${inputs.fy} × (${inputs.d}-${a.toFixed(2)}/2) + ${inputs.Asprime} × ${fprime.toFixed(2)} × (${inputs.d}-${inputs.dprime}))`);
+      }
+      
+      solutions.push(`         Mu = ${Mn.toFixed(2)} kN·m`);
       
       finalAnswer = `The beam is Doubly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
     }
