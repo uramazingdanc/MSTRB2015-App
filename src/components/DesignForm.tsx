@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SolutionsDisplay } from "./SolutionsDisplay";
@@ -61,12 +60,14 @@ export const DesignForm = () => {
     // Step 2: Calculate phi (reduction factor)
     const phi = 0.65 + 0.25 * (800 - inputs.fy) / (1000 - inputs.fy);
     
-    // Calculate Mnmax (maximum nominal moment capacity) - Updated formula
-    // Mnmax = (51/140) * beta * fc * b * d^2 * (1 - 3/14 * beta) * (1/1000^2)
+    // Calculate Mnmax (maximum nominal moment capacity)
     const Mnmax = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta) / 1000000;
     
-    // Step 3: Determine beam type
-    const beamType = inputs.MU > Mnmax ? 'Doubly Reinforced' : 'Singly Reinforced';
+    // Calculate ØMnmax (maximum design moment capacity) - UPDATED
+    const phiMnmax = phi * Mnmax;
+    
+    // Step 3: Determine beam type - UPDATED: Compare MU with ØMnmax instead of Mnmax
+    const beamType = inputs.MU > phiMnmax ? 'Doubly Reinforced' : 'Singly Reinforced';
     
     // Initialize variables for step-by-step solutions
     let solutions: string[] = [
@@ -77,18 +78,17 @@ export const DesignForm = () => {
       `Mnmax = (51/140) × ${beta.toFixed(4)} × ${inputs.fc} × ${inputs.b} × ${inputs.d}² × (1 - 3/14 × ${beta.toFixed(4)}) × (1/1000²)`,
       `Mnmax = ${Mnmax.toFixed(2)} kN·m`,
       `φ = 0.65 + 0.25 × (800 - ${inputs.fy}) / (1000 - ${inputs.fy}) = ${phi.toFixed(4)}`,
-      `φMnmax = ${phi.toFixed(4)} × ${Mnmax.toFixed(2)} = ${(phi * Mnmax).toFixed(2)} kN·m`,
+      `φMnmax = ${phi.toFixed(4)} × ${Mnmax.toFixed(2)} = ${phiMnmax.toFixed(2)} kN·m`,
       `Step 3: Identify Beam Type`,
       `Mu = ${inputs.MU} kN·m`,
-      `Since ${inputs.MU} ${inputs.MU <= Mnmax ? "≤" : ">"} ${Mnmax.toFixed(2)} kN·m, this is a ${beamType}`
+      `Since ${inputs.MU} ${inputs.MU <= phiMnmax ? "≤" : ">"} ${phiMnmax.toFixed(2)} kN·m, this is a ${beamType}`
     ];
 
     let As = 0;
     let Asprime = 0;
     
     if (beamType === 'Singly Reinforced') {
-      // Calculate ØMtn for tension-controlled section - Updated formula
-      // phiMtn = (459/1600) * beta * fc * b * d^2 * (1 - 3/16 * beta) * (1/1000^2)
+      // Calculate ØMtn for tension-controlled section
       const phiMtn = (459/1600) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/16 * beta) / 1000000;
       
       solutions.push(`Step 4: Compute ØMtn for tension-controlled section`);
@@ -124,7 +124,6 @@ export const DesignForm = () => {
         solutions.push(`Since Mu (${inputs.MU} kN·m) > ØMtn (${phiMtn.toFixed(2)} kN·m), the beam is in the Transition Region`);
         
         // Approximate solution for neutral axis depth (c)
-        // This is a simplification as the exact solution would require an iterative approach
         const k = inputs.MU * 1000000 / (0.85 * inputs.fc * inputs.b * Math.pow(inputs.d, 2));
         const c_approx = (1 - Math.sqrt(1 - 2 * k)) * inputs.d;
         
@@ -144,7 +143,8 @@ export const DesignForm = () => {
         solutions.push(`As = (0.85 × ${inputs.fc} × ${a.toFixed(2)} × ${inputs.b}) / ${inputs.fy} = ${As.toFixed(2)} mm²`);
       }
     } else {
-      // Doubly Reinforced Beam
+      // Doubly Reinforced Beam - UPDATED: Now based on the comparison with ØMnmax
+      
       // Step 4: Compute As1
       const As1 = pmax * inputs.b * inputs.d;
       
@@ -152,10 +152,10 @@ export const DesignForm = () => {
       solutions.push(`As1 = Pmax × b × d = ${pmax.toFixed(6)} × ${inputs.b} × ${inputs.d} = ${As1.toFixed(2)} mm²`);
       
       // Step 5: Compute ØMn2 (additional moment to be resisted by compression steel)
-      const phiMn2 = inputs.MU - (phi * Mnmax);
+      const phiMn2 = inputs.MU - phiMnmax;
       
       solutions.push(`Step 5: Compute ØMn2 (additional moment)`);
-      solutions.push(`ØMn2 = Mu - φMnmax = ${inputs.MU} - (${phi.toFixed(4)} × ${Mnmax.toFixed(2)}) = ${phiMn2.toFixed(2)} kN·m`);
+      solutions.push(`ØMn2 = Mu - φMnmax = ${inputs.MU} - ${phiMnmax.toFixed(2)} = ${phiMn2.toFixed(2)} kN·m`);
       
       // Step 6: Compute As2 (additional tension steel)
       const As2 = (phiMn2 * 1000000) / (inputs.fy * (inputs.d - inputs.dprime) * phi);

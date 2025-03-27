@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SolutionsDisplay } from "./SolutionsDisplay";
@@ -88,7 +87,7 @@ export const AnalysisForm = () => {
     
     if (beamType === 'Singly Reinforced') {
       // For Singly Reinforced Beams
-      // Step 6: Compute a and c
+      // Step 6: Compute a and c using As instead of Asmax
       const a = (inputs.As * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
@@ -131,9 +130,8 @@ export const AnalysisForm = () => {
       finalAnswer = `The beam is Singly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
     } else {
       // For Doubly Reinforced Beams - Updated approach
-      // Step 6: Assuming compression steel yields
-      // Calculate a, c for balanced section
-      const a = (asmax * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      // Step 6: Compute a and c using As instead of Asmax
+      const a = (inputs.As * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
       // Check if compression steel yields
@@ -162,7 +160,7 @@ export const AnalysisForm = () => {
       
       solutions = [
         ...solutions,
-        `Step 6: Compute a = (Asmax × fy)/(0.85 × f'c × b) = (${asmax.toFixed(2)} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
+        `Step 6: Compute a = (As × fy)/(0.85 × f'c × b) = (${inputs.As} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
         `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
         `Step 7: Compute f's = 600 × ((c-d')/c) = 600 × ((${c.toFixed(2)}-${inputs.dprime})/${c.toFixed(2)}) = ${fprime.toFixed(2)} MPa`,
         `         ${fprimeStatus}`,
