@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SolutionsDisplay } from "./SolutionsDisplay";
@@ -164,12 +165,12 @@ export const DesignForm = () => {
       solutions.push(`As2 = (${phiMn2.toFixed(2)} × 10⁶) / (${inputs.fy} × (${inputs.d} - ${inputs.dprime}) × ${phi.toFixed(4)})`);
       solutions.push(`As2 = ${As2.toFixed(2)} mm²`);
       
-      // Step 7: Compute a and c
+      // Step 7: Compute a and c using As1 instead of As
       const a = (As1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
       solutions.push(`Step 7: Compute a and c`);
-      solutions.push(`a = (${As1.toFixed(2)} × ${inputs.fy}) / (0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`);
+      solutions.push(`a = (As1 × fy) / (0.85 × f'c × b) = (${As1.toFixed(2)} × ${inputs.fy}) / (0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`);
       solutions.push(`c = a / β = ${a.toFixed(2)} / ${beta.toFixed(4)} = ${c.toFixed(2)} mm`);
       
       // Step 8: Compute f's (stress in compression steel)
@@ -182,6 +183,7 @@ export const DesignForm = () => {
         // Compression Bar Yields
         solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) ≥ fy (${inputs.fy} MPa), the compression bar yields`);
         
+        // CORRECTED: As = As1 + As2 (not As1 + As')
         As = As1 + As2;
         Asprime = As2;
         
@@ -193,11 +195,12 @@ export const DesignForm = () => {
         solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) < fy (${inputs.fy} MPa), the compression bar does not yield`);
         
         Asprime = (As2 * inputs.fy) / fs_prime;
-        As = As1 + Asprime;
+        // CORRECTED: As = As1 + As2 (not As1 + As')
+        As = As1 + As2;
         
         solutions.push(`Step 8.2: Compute A's and As`);
         solutions.push(`A's = (As2 × fy) / f's = (${As2.toFixed(2)} × ${inputs.fy}) / ${fs_prime.toFixed(2)} = ${Asprime.toFixed(2)} mm²`);
-        solutions.push(`As = As1 + A's = ${As1.toFixed(2)} + ${Asprime.toFixed(2)} = ${As.toFixed(2)} mm²`);
+        solutions.push(`As = As1 + As2 = ${As1.toFixed(2)} + ${As2.toFixed(2)} = ${As.toFixed(2)} mm²`);
       }
     }
     
