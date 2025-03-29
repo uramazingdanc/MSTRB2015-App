@@ -64,10 +64,10 @@ export const DesignForm = () => {
     // Calculate Mnmax (maximum nominal moment capacity)
     const Mnmax = (51/140) * beta * inputs.fc * inputs.b * Math.pow(inputs.d, 2) * (1 - 3/14 * beta) / 1000000;
     
-    // Calculate ØMnmax (maximum design moment capacity) - UPDATED
+    // Calculate ØMnmax (maximum design moment capacity)
     const phiMnmax = phi * Mnmax;
     
-    // Step 3: Determine beam type - UPDATED: Compare MU with ØMnmax instead of Mnmax
+    // Step 3: Determine beam type - Compare MU with ØMnmax
     const beamType = inputs.MU > phiMnmax ? 'Doubly Reinforced' : 'Singly Reinforced';
     
     // Initialize variables for step-by-step solutions
@@ -144,7 +144,7 @@ export const DesignForm = () => {
         solutions.push(`As = (0.85 × ${inputs.fc} × ${a.toFixed(2)} × ${inputs.b}) / ${inputs.fy} = ${As.toFixed(2)} mm²`);
       }
     } else {
-      // Doubly Reinforced Beam - UPDATED: Now based on the comparison with ØMnmax
+      // Doubly Reinforced Beam
       
       // Step 4: Compute As1
       const As1 = pmax * inputs.b * inputs.d;
@@ -165,11 +165,11 @@ export const DesignForm = () => {
       solutions.push(`As2 = (${phiMn2.toFixed(2)} × 10⁶) / (${inputs.fy} × (${inputs.d} - ${inputs.dprime}) × ${phi.toFixed(4)})`);
       solutions.push(`As2 = ${As2.toFixed(2)} mm²`);
       
-      // Step 7: Compute a and c using As1 instead of As
+      // Step 7: Compute a and c using As1 (not As)
       const a = (As1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
-      solutions.push(`Step 7: Compute a and c`);
+      solutions.push(`Step 7: Compute a and c using As1`);
       solutions.push(`a = (As1 × fy) / (0.85 × f'c × b) = (${As1.toFixed(2)} × ${inputs.fy}) / (0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`);
       solutions.push(`c = a / β = ${a.toFixed(2)} / ${beta.toFixed(4)} = ${c.toFixed(2)} mm`);
       
@@ -183,7 +183,7 @@ export const DesignForm = () => {
         // Compression Bar Yields
         solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) ≥ fy (${inputs.fy} MPa), the compression bar yields`);
         
-        // CORRECTED: As = As1 + As2 (not As1 + As')
+        // As = As1 + As2
         As = As1 + As2;
         Asprime = As2;
         
@@ -195,7 +195,7 @@ export const DesignForm = () => {
         solutions.push(`Since f's (${fs_prime.toFixed(2)} MPa) < fy (${inputs.fy} MPa), the compression bar does not yield`);
         
         Asprime = (As2 * inputs.fy) / fs_prime;
-        // CORRECTED: As = As1 + As2 (not As1 + As')
+        // As = As1 + As2
         As = As1 + As2;
         
         solutions.push(`Step 8.2: Compute A's and As`);
