@@ -130,19 +130,18 @@ export const AnalysisForm = () => {
       finalAnswer = `The beam is Singly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
     } else {
       // For Doubly Reinforced Beams - Updated approach
-      // Step 6: Compute a and c using As instead of Asmax
-      const a = (inputs.As * inputs.fy) / (0.85 * inputs.fc * inputs.b);
+      
+      // Step 6: Calculate As1 and As2 as per the updated formula
+      const As2 = inputs.Asprime;
+      const As1 = inputs.As - As2;
+      
+      // Update calculation of 'a' to use As1 instead of As
+      const a = (As1 * inputs.fy) / (0.85 * inputs.fc * inputs.b);
       const c = a / beta;
       
       // Check if compression steel yields
       const fprime = 600 * ((c - inputs.dprime) / c);
       const fprimeStatus = fprime >= inputs.fy ? "f's ≥ fy, compression steel yields" : "f's < fy, compression steel does not yield";
-      
-      // Calculate As2
-      const As2 = inputs.Asprime;
-      
-      // Calculate As1
-      const As1 = inputs.As - As2;
       
       // Step 8: Compute reduction factor Ø
       const fs = 600 * ((inputs.d - c) / c);
@@ -160,12 +159,13 @@ export const AnalysisForm = () => {
       
       solutions = [
         ...solutions,
-        `Step 6: Compute a = (As × fy)/(0.85 × f'c × b) = (${inputs.As} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
-        `         Compute c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
+        `Step 6: Solve for As1 and As2`,
+        `         As2 = A's = ${inputs.Asprime} mm²`,
+        `         As1 = As - As2 = ${inputs.As} - ${inputs.Asprime} = ${As1.toFixed(2)} mm²`,
+        `         a = (As1 × fy)/(0.85 × f'c × b) = (${As1.toFixed(2)} × ${inputs.fy})/(0.85 × ${inputs.fc} × ${inputs.b}) = ${a.toFixed(2)} mm`,
+        `         c = a/β = ${a.toFixed(2)}/${beta.toFixed(4)} = ${c.toFixed(2)} mm`,
         `Step 7: Compute f's = 600 × ((c-d')/c) = 600 × ((${c.toFixed(2)}-${inputs.dprime})/${c.toFixed(2)}) = ${fprime.toFixed(2)} MPa`,
         `         ${fprimeStatus}`,
-        `         Compute As2 = A's = ${inputs.Asprime} mm²`,
-        `         Compute As1 = As - As2 = ${inputs.As} - ${inputs.Asprime} = ${As1.toFixed(2)} mm²`,
         `         Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${c.toFixed(2)})/${c.toFixed(2)}) = ${fs.toFixed(2)} MPa`,
         `Step 8: Compute reduction factor Ø:`
       ];
