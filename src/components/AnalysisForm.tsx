@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SolutionsDisplay } from "./SolutionsDisplay";
@@ -123,25 +122,48 @@ export const AnalysisForm = () => {
         solutions.push(`         Since fs (${fs.toFixed(2)}) < fy (${inputs.fy}), the steel does not yield`);
         
         // Use quadratic formula to find 'c'
-        solutions.push(`Step 8: Recalculate 'c' using quadratic formula since steel does not yield`);
+        solutions.push(`Step 8: Determine "c" using the Quadratic Formula:`);
         
-        // For simplicity, we'll use the previously calculated 'c' value
-        // In a real implementation, you would solve the quadratic equation here
+        // Calculate quadratic formula components for singly reinforced non-yielding
+        const A = 1.7 * inputs.fc * inputs.b;
+        const B = -600 * inputs.As;
+        const C = 2040 * inputs.fc * inputs.b * inputs.As * inputs.d;
+        
+        const discriminant = (600 * inputs.As) ** 2 + C;
+        
+        const c1 = (B + Math.sqrt(discriminant)) / A;
+        const c2 = (B - Math.sqrt(discriminant)) / A;
+        
+        solutions.push(`         c₁ = (-600As + √(360000(As)² + 2040·fc'·b·As·d)) / (1.7·fc'·b)`);
+        solutions.push(`         c₁ = (-600·${inputs.As} + √(360000·(${inputs.As})² + 2040·${inputs.fc}·${inputs.b}·${inputs.As}·${inputs.d})) / (1.7·${inputs.fc}·${inputs.b})`);
+        solutions.push(`         c₁ = ${c1.toFixed(2)} mm`);
+        
+        solutions.push(`         c₂ = (-600As - √(360000(As)² + 2040·fc'·b·As·d)) / (1.7·fc'·b)`);
+        solutions.push(`         c₂ = (-600·${inputs.As} - √(360000·(${inputs.As})² + 2040·${inputs.fc}·${inputs.b}·${inputs.As}·${inputs.d})) / (1.7·${inputs.fc}·${inputs.b})`);
+        solutions.push(`         c₂ = ${c2.toFixed(2)} mm`);
+        
+        // Select highest value of c that doesn't exceed beam height
+        const selectedC = Math.max(c1, c2) <= inputs.d ? Math.max(c1, c2) : Math.min(inputs.d, Math.max(c1, c2));
+        solutions.push(`         Select the highest value of c (${Math.max(c1, c2).toFixed(2)}) that doesn't exceed beam height (${inputs.d})`);
+        solutions.push(`         Selected c = ${selectedC.toFixed(2)} mm`);
         
         // Re-calculate fs with the selected 'c'
-        solutions.push(`Step 9: Recalculate fs with the selected 'c' value`);
+        const updatedFs = 600 * ((inputs.d - selectedC) / selectedC);
+        solutions.push(`Step 9: Compute fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${selectedC.toFixed(2)})/${selectedC.toFixed(2)}) = ${updatedFs.toFixed(2)} MPa`);
         
         // Calculate 'a' (a = β × c)
-        const updatedA = beta * c;
-        solutions.push(`Step 10: Calculate 'a' = β × c = ${beta.toFixed(4)} × ${c.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
+        const updatedA = beta * selectedC;
+        solutions.push(`Step 10: Calculate a = β × c = ${beta.toFixed(4)} × ${selectedC.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
         
         // Set Ø = 0.65 (compression-controlled)
         phi = 0.65;
         solutions.push(`Step 11: Set Ø = 0.65 (compression-controlled)`);
         
         // Calculate Mu
-        Mn = (phi * inputs.As * fs * (inputs.d - updatedA/2)) / 1000000; // Convert to kN·m
-        solutions.push(`Step 12: Calculate Mu = Ø × As × fs × (d-a/2) = ${phi.toFixed(2)} × ${inputs.As} × ${fs.toFixed(2)} × (${inputs.d}-${updatedA.toFixed(2)}/2) = ${Mn.toFixed(2)} kN·m`);
+        Mn = (phi * inputs.As * updatedFs * (inputs.d - updatedA/2)) / 1000000; // Convert to kN·m
+        solutions.push(`Step 12: Calculate Mu = Ø × As × fs × (d-a/2) × (1/10^6)`);
+        solutions.push(`         Mu = 0.65 × ${inputs.As} × ${updatedFs.toFixed(2)} × (${inputs.d}-${updatedA.toFixed(2)}/2) × (1/10^6)`);
+        solutions.push(`         Mu = ${Mn.toFixed(2)} kN·m`);
       }
       
       finalAnswer = `The beam is Singly Reinforced with a moment capacity of ${Mn.toFixed(2)} kN·m.`;
@@ -204,28 +226,50 @@ export const AnalysisForm = () => {
           solutions.push(`Step 5.6: Compare fs' with fy: ${fprime.toFixed(2)} < ${inputs.fy}, compression steel does not yield`);
           
           // Steps 5.9 - 5.12 (for non-yielding compression steel)
-          solutions.push(`Step 5.9: Recalculate 'c' using quadratic formula (simplified for this example)`);
+          solutions.push(`Step 5.9: Recalculate 'c' using quadratic formula:`);
           
-          // For simplicity, we'll use the already calculated 'c' value
-          // In a real implementation, you would solve the quadratic equation
+          // Calculate quadratic formula components
+          const A = 1.7 * inputs.fc * inputs.b;
+          const B = -(600 * inputs.Asprime - inputs.As * inputs.fy);
+          const C = 2040 * inputs.fc * inputs.b * inputs.Asprime * inputs.dprime;
+          
+          const discriminant = Math.pow((600 * inputs.Asprime - inputs.As * inputs.fy), 2) + C;
+          
+          const c1 = (B + Math.sqrt(discriminant)) / A;
+          const c2 = (B - Math.sqrt(discriminant)) / A;
+          
+          solutions.push(`         c₁ = (-(600A's - Asfy) + √((600A's - Asfy)² + 2040fc'bA's'd')) / (1.7fc'b)`);
+          solutions.push(`         c₁ = (-(600·${inputs.Asprime} - ${inputs.As}·${inputs.fy}) + √((600·${inputs.Asprime} - ${inputs.As}·${inputs.fy})² + 2040·${inputs.fc}·${inputs.b}·${inputs.Asprime}·${inputs.dprime})) / (1.7·${inputs.fc}·${inputs.b})`);
+          solutions.push(`         c₁ = ${c1.toFixed(2)} mm`);
+          
+          solutions.push(`         c₂ = (-(600A's - Asfy) - √((600A's - Asfy)² + 2040fc'bA's'd')) / (1.7fc'b)`);
+          solutions.push(`         c₂ = (-(600·${inputs.Asprime} - ${inputs.As}·${inputs.fy}) - √((600·${inputs.Asprime} - ${inputs.As}·${inputs.fy})² + 2040·${inputs.fc}·${inputs.b}·${inputs.Asprime}·${inputs.dprime})) / (1.7·${inputs.fc}·${inputs.b})`);
+          solutions.push(`         c₂ = ${c2.toFixed(2)} mm`);
+          
+          // Select highest value of c that doesn't exceed beam height
+          const selectedC = Math.max(c1, c2) <= inputs.d ? Math.max(c1, c2) : Math.min(inputs.d, Math.max(c1, c2));
+          solutions.push(`         Select the highest value of c (${Math.max(c1, c2).toFixed(2)}) that doesn't exceed beam height (${inputs.d})`);
+          solutions.push(`         Selected c = ${selectedC.toFixed(2)} mm`);
           
           // Step 5.10: Calculate 'a' and recalculate fs' and fs
-          const updatedA = beta * c;
-          const updatedFprime = fprime; // We're using the same 'c' for simplicity
+          const updatedA = beta * selectedC;
+          const updatedFprime = 600 * ((selectedC - inputs.dprime) / selectedC);
+          const updatedFs = 600 * ((inputs.d - selectedC) / selectedC);
           
-          solutions.push(`Step 5.10: Calculate 'a' = β × c = ${beta.toFixed(4)} × ${c.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
-          solutions.push(`         Recalculate fs' and fs (using same 'c' for simplicity)`);
+          solutions.push(`Step 5.10: Calculate 'a' = β × c = ${beta.toFixed(4)} × ${selectedC.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
+          solutions.push(`         Recalculate fs' = 600 × ((c-d')/c) = 600 × ((${selectedC.toFixed(2)}-${inputs.dprime})/${selectedC.toFixed(2)}) = ${updatedFprime.toFixed(2)} MPa`);
+          solutions.push(`         Recalculate fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${selectedC.toFixed(2)})/${selectedC.toFixed(2)}) = ${updatedFs.toFixed(2)} MPa`);
           
           // Step 5.11: Determine reduction factor (Ø) - same logic as 5.7
-          if (fs >= 1000) {
+          if (updatedFs >= 1000) {
             phi = 0.9;
-            solutions.push(`Step 5.11: Since fs (${fs.toFixed(2)}) ≥ 1000, Ø = 0.90`);
-          } else if (fs >= inputs.fy && fs < 1000) {
-            phi = 0.65 + 0.25 * ((fs - inputs.fy) / (1000 - inputs.fy));
-            solutions.push(`Step 5.11: Since ${inputs.fy} ≤ fs (${fs.toFixed(2)}) < 1000, Ø = 0.65 + 0.25 × ((${fs.toFixed(2)} - ${inputs.fy})/(1000 - ${inputs.fy})) = ${phi.toFixed(4)}`);
+            solutions.push(`Step 5.11: Since fs (${updatedFs.toFixed(2)}) ≥ 1000, Ø = 0.90`);
+          } else if (updatedFs >= inputs.fy && updatedFs < 1000) {
+            phi = 0.65 + 0.25 * ((updatedFs - inputs.fy) / (1000 - inputs.fy));
+            solutions.push(`Step 5.11: Since ${inputs.fy} ≤ fs (${updatedFs.toFixed(2)}) < 1000, Ø = 0.65 + 0.25 × ((${updatedFs.toFixed(2)} - ${inputs.fy})/(1000 - ${inputs.fy})) = ${phi.toFixed(4)}`);
           } else {
             phi = 0.65;
-            solutions.push(`Step 5.11: Since fs (${fs.toFixed(2)}) < fy (${inputs.fy}), Ø = 0.65`);
+            solutions.push(`Step 5.11: Since fs (${updatedFs.toFixed(2)}) < fy (${inputs.fy}), Ø = 0.65`);
           }
           
           // Step 5.12: Calculate moment Mu using formula with actual fs'
@@ -237,26 +281,57 @@ export const AnalysisForm = () => {
       } else {
         // Tension steel does not yield - Step 5.13
         solutions.push(`Step 5.5: Compare fs with fy: ${fs.toFixed(2)} < ${inputs.fy}, tension steel does not yield`);
-        solutions.push(`Step 5.13: Since tension steel does not yield, recalculate 'c' using quadratic formula (simplified for this example)`);
+        solutions.push(`Step 5.13: Since tension steel does not yield, recalculate 'c' using quadratic formula:`);
         
-        // For simplicity, we'll use the already calculated 'c' value
-        // In a real implementation, you would solve the quadratic equation
+        // Calculate quadratic formula components for non-yielding tension steel
+        const A = 1.7 * inputs.fc * inputs.b;
+        const B = -(600 * inputs.As + inputs.Asprime * inputs.fy);
+        const C = 2040 * inputs.fc * inputs.b * inputs.As * inputs.d;
+        
+        const discriminant = Math.pow((600 * inputs.As + inputs.Asprime * inputs.fy), 2) + C;
+        
+        const c1 = (B + Math.sqrt(discriminant)) / A;
+        const c2 = (B - Math.sqrt(discriminant)) / A;
+        
+        solutions.push(`         c₁ = (-(600As + A'sfy) + √((600As + A'sfy)² + 2040fc'bAsd)) / (1.7fc'b)`);
+        solutions.push(`         c₁ = (-(600·${inputs.As} + ${inputs.Asprime}·${inputs.fy}) + √((600·${inputs.As} + ${inputs.Asprime}·${inputs.fy})² + 2040·${inputs.fc}·${inputs.b}·${inputs.As}·${inputs.d})) / (1.7·${inputs.fc}·${inputs.b})`);
+        solutions.push(`         c₁ = ${c1.toFixed(2)} mm`);
+        
+        solutions.push(`         c₂ = (-(600As + A'sfy) - √((600As + A'sfy)² + 2040fc'bAsd)) / (1.7fc'b)`);
+        solutions.push(`         c₂ = (-(600·${inputs.As} + ${inputs.Asprime}·${inputs.fy}) - √((600·${inputs.As} + ${inputs.Asprime}·${inputs.fy})² + 2040·${inputs.fc}·${inputs.b}·${inputs.As}·${inputs.d})) / (1.7·${inputs.fc}·${inputs.b})`);
+        solutions.push(`         c₂ = ${c2.toFixed(2)} mm`);
+        
+        // Select highest value of c that doesn't exceed beam height
+        const selectedC = Math.max(c1, c2) <= inputs.d ? Math.max(c1, c2) : Math.min(inputs.d, Math.max(c1, c2));
+        solutions.push(`         Select the highest value of c (${Math.max(c1, c2).toFixed(2)}) that doesn't exceed beam height (${inputs.d})`);
+        solutions.push(`         Selected c = ${selectedC.toFixed(2)} mm`);
         
         // Recalculate fs' and fs with the selected 'c'
-        // We're using the same values for simplicity
+        const updatedFprime = 600 * ((selectedC - inputs.dprime) / selectedC);
+        const updatedFs = 600 * ((inputs.d - selectedC) / selectedC);
+        solutions.push(`         Calculate fs' = 600 × ((c-d')/c) = 600 × ((${selectedC.toFixed(2)}-${inputs.dprime})/${selectedC.toFixed(2)}) = ${updatedFprime.toFixed(2)} MPa`);
+        solutions.push(`         Calculate fs = 600 × ((d-c)/c) = 600 × ((${inputs.d}-${selectedC.toFixed(2)})/${selectedC.toFixed(2)}) = ${updatedFs.toFixed(2)} MPa`);
         
         // Determine Ø factor (same criteria as Step 5.7)
-        phi = 0.65; // Since fs < fy
-        solutions.push(`         Set Ø = 0.65 (compression-controlled)`);
+        if (updatedFs >= 1000) {
+          phi = 0.9;
+          solutions.push(`         Since fs (${updatedFs.toFixed(2)}) ≥ 1000, Ø = 0.90`);
+        } else if (updatedFs >= inputs.fy && updatedFs < 1000) {
+          phi = 0.65 + 0.25 * ((updatedFs - inputs.fy) / (1000 - inputs.fy));
+          solutions.push(`         Since ${inputs.fy} ≤ fs (${updatedFs.toFixed(2)}) < 1000, Ø = 0.65 + 0.25 × ((${updatedFs.toFixed(2)} - ${inputs.fy})/(1000 - ${inputs.fy})) = ${phi.toFixed(4)}`);
+        } else {
+          phi = 0.65;
+          solutions.push(`         Since fs (${updatedFs.toFixed(2)}) < fy (${inputs.fy}), Ø = 0.65 (compression-controlled)`);
+        }
         
         // Calculate 'a' (a = β × c)
-        const updatedA = beta * c;
-        solutions.push(`         Calculate 'a' = β × c = ${beta.toFixed(4)} × ${c.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
+        const updatedA = beta * selectedC;
+        solutions.push(`         Calculate 'a' = β × c = ${beta.toFixed(4)} × ${selectedC.toFixed(2)} = ${updatedA.toFixed(2)} mm`);
         
         // Calculate moment Mu
         Mn = (phi * (0.85 * inputs.fc * updatedA * inputs.b * (inputs.d - updatedA/2) + inputs.Asprime * inputs.fy * (inputs.d - inputs.dprime))) / 1000000; // Convert to kN·m
-        solutions.push(`         Calculate Mu = [Ø × (0.85 fc' × a × b × (d-a/2) + As' × fy × (d-d'))]/10^6`);
-        solutions.push(`         Mu = [${phi.toFixed(2)} × (0.85 × ${inputs.fc} × ${updatedA.toFixed(2)} × ${inputs.b} × (${inputs.d}-${updatedA.toFixed(2)}/2) + ${inputs.Asprime} × ${inputs.fy} × (${inputs.d}-${inputs.dprime}))]/10^6`);
+        solutions.push(`         Calculate Mu = [Ø × (0.85·fc'·a·b·(d-a/2) + As'·fy·(d-d'))]/10^6`);
+        solutions.push(`         Mu = [${phi.toFixed(4)} × (0.85 × ${inputs.fc} × ${updatedA.toFixed(2)} × ${inputs.b} × (${inputs.d}-${updatedA.toFixed(2)}/2) + ${inputs.Asprime} × ${inputs.fy} × (${inputs.d}-${inputs.dprime}))]/10^6`);
         solutions.push(`         Mu = ${Mn.toFixed(2)} kN·m`);
       }
       
